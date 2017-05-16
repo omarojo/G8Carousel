@@ -11,11 +11,22 @@ import UIKit
 
 class G8Carousel: UIView {
 
+    var allowMultipleSelection = false
+    var maximumAllowedItemSelection = 3 //number of allowed items to be selected, ex. no more than 3
+    var currentSelectedItems: Array = [G8CarouselItem]() {
+        didSet {
+            print("G8Carousel >> Current Selected: \(currentSelectedItems)")
+        }
+    }
+    
+    
     var collectionView: UICollectionView!
-    let clearFiltersButton = UIButton()
-    var clearFiltersButtonCallback: (()->())?
+    fileprivate let clearItemsButton = UIButton()
+    var clearItemsButtonCallback: (()->())?
+    weak var delegate: G8CarouselDelegate?
+    
     //DataSource
-    var filters = [G8CarouselItem]() {
+    var allItems = [G8CarouselItem]() {
         didSet{
             collectionView.reloadData()
         }
@@ -34,6 +45,7 @@ class G8Carousel: UIView {
     func setupUI(){
         
         self.autoresizingMask = [.flexibleWidth, .flexibleLeftMargin, .flexibleRightMargin]
+        self.layer.masksToBounds = true
         //Flowlayout
         let flowlayout = UICollectionViewFlowLayout()
         flowlayout.scrollDirection = .horizontal
@@ -51,25 +63,39 @@ class G8Carousel: UIView {
         collectionView.autoresizesSubviews = true
         collectionView.allowsMultipleSelection = true
         collectionView.backgroundColor = .red
+        collectionView.showsHorizontalScrollIndicator = false
         collectionView.collectionViewLayout = flowlayout
         collectionView.delegate = self
         collectionView.dataSource = self
-        collectionView.register(G8FilterCell.self, forCellWithReuseIdentifier: "FilterCell")
+        collectionView.register(G8CarouselItemCell.self, forCellWithReuseIdentifier: "ItemCell")
         
         //Clear Button
-        clearFiltersButton.setImage(UIImage.init(named: "thumbReset"), for: .normal)
-        clearFiltersButton.frame = CGRect(origin: CGPoint(x:5, y:collectionView.frame.origin.y), size: CGSize(width:flowlayout.itemSize.width, height:flowlayout.itemSize.height))
-        clearFiltersButton.addTarget(self, action: #selector(clearButtonTapped), for: .touchUpInside)
+        clearItemsButton.setImage(UIImage.init(named: "thumbReset"), for: .normal)
+        
+        clearItemsButton.frame = CGRect(origin: CGPoint(x:5, y:collectionView.frame.origin.y), size: CGSize(width:flowlayout.itemSize.width, height:flowlayout.itemSize.height))
+        clearItemsButton.addTarget(self, action: #selector(clearButtonTapped), for: .touchUpInside)
         
         
         self.addSubview(collectionView)
-        self.addSubview(clearFiltersButton)
+        self.addSubview(clearItemsButton)
         
     
     }
     
     func clearButtonTapped(sender: UIButton){
-        clearFiltersButtonCallback?()
+        let selectedItems = collectionView.indexPathsForSelectedItems
+        if let items = selectedItems{
+            for indexPath in items {
+                collectionView.deselectItem(at: indexPath, animated:false)
+                //            if let cell = followCollectionView.cellForItemAtIndexPath(indexPath) as? FollowCell {
+                //                cell.checkImg.hidden = true
+                //            }
+            }
+        }
+        
+        currentSelectedItems.removeAll()
+        clearItemsButtonCallback?()
+        self.delegate?.didClearSelections(collectionView: collectionView)
     }
 
 }
@@ -78,34 +104,77 @@ extension G8Carousel: UICollectionViewDelegate, UICollectionViewDataSource{
 
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "FilterCell", for: indexPath) as! G8FilterCell
-        cell.imageView.image = filters[indexPath.row].thumb
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ItemCell", for: indexPath) as! G8CarouselItemCell
+        cell.imageView.image = allItems[indexPath.row].thumb
         
         
         return cell
     }
     //Data Source
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return filters.count
+        return allItems.count
     }
     func numberOfSections(in collectionView: UICollectionView) -> Int {
         return 1
     }
     
     //Delegate
+    func collectionView(_ collectionView: UICollectionView, shouldSelectItemAt indexPath: IndexPath) -> Bool {
+        if(allowMultipleSelection){
+            if(currentSelectedItems.count < maximumAllowedItemSelection){
+                return true
+            }else { return false}
+        }
+        return true
+        
+    }
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         print("G8Carousel >> Selected index: \(indexPath.row)")
         
+        
+        if(allowMultipleSelection == false){ //this is a trick
+            let selectedIndexes = collectionView.indexPathsForSelectedItems;
+            // Don't deselect our own index path
+            if var selectedInd = selectedIndexes{
+                if let index = selectedInd.index(of:indexPath) {
+                    selectedInd.remove(at: index)
+                }
+                for iPath in selectedInd {
+                    collectionView.deselectItem(at: iPath, animated: true)
+                }
+            }
+            self.currentSelectedItems.append(allItems[indexPath.item])
+        }else{
+            currentSelectedItems.removeAll()
+            self.currentSelectedItems.append(allItems[indexPath.item])
+        }
+        
+        
+        self.delegate?.didSelectItem(item: allItems[indexPath.item] as G8CarouselItem, collectionView: collectionView)
     }
     func collectionView(_ collectionView: UICollectionView, didDeselectItemAt indexPath: IndexPath) {
         print("G8Carousel >> DeSelected index: \(indexPath.row)")
+        
+        let indexToRemove = currentSelectedItems.index(where: {$0 === allItems[indexPath.item]})
+        if indexToRemove != nil {
+            currentSelectedItems.remove(at: indexToRemove!)
+        }
+        
+        
+        self.delegate?.didDeselectItem(item: allItems[indexPath.item] as G8CarouselItem, collectionView: collectionView)
     }
 
 
 }
+//MARK: G8Carousel Protocol
+protocol G8CarouselDelegate: class {
+    func didSelectItem(item: G8CarouselItem, collectionView: UICollectionView)
+    func didDeselectItem(item: G8CarouselItem, collectionView: UICollectionView)
+    func didClearSelections(collectionView: UICollectionView)
+}
 
 //MARK: Custom Cell
-class G8FilterCell: UICollectionViewCell {
+class G8CarouselItemCell: UICollectionViewCell {
     
     var backTransView = UIView()
     var imageView = UIImageView(image: UIImage(named: "filterThumbPlaceHolder"))
@@ -113,16 +182,25 @@ class G8FilterCell: UICollectionViewCell {
     override var isSelected: Bool {
         didSet{
             if(isSelected){
-                self.alpha = 0.5
+//                self.alpha = 0.5
+                UIView.animate(withDuration: 0.3, animations: { 
+                    self.imageView.transform = CGAffineTransform(scaleX: 0.7, y: 0.7)
+                    self.backTransView.backgroundColor = UIColor.init(colorLiteralRed: 1.0, green: 1.0, blue: 1.0, alpha: 0.4)
+                })
+                
             }else{
-                self.alpha = 1.0
+//                self.alpha = 1.0
+                UIView.animate(withDuration: 0.3, animations: {
+                    self.imageView.transform = CGAffineTransform.identity
+                    self.backTransView.backgroundColor = UIColor.init(colorLiteralRed: 0.0, green: 0.0, blue: 0.0, alpha: 0.4)
+                })
             }
         }
     }
     
     override func layoutSubviews() {
         super.layoutSubviews()
-        
+        self.layer.masksToBounds = false
         backTransView.frame = CGRect(x: 0, y: 0, width: contentView.bounds.width, height: contentView.bounds.height)
         
         

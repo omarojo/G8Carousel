@@ -18,7 +18,7 @@ class ViewController: UIViewController {
         g8Car = G8Carousel.init(frame: CGRect(x: 0, y: 0, width: self.view.bounds.width, height: 150))
         
         let filterItems = [G8CarouselItem(),G8CarouselItem(),G8CarouselItem(),G8CarouselItem(),G8CarouselItem(),G8CarouselItem(),G8CarouselItem(),G8CarouselItem(),G8CarouselItem(),G8CarouselItem(),G8CarouselItem()]
-        g8Car.filters = filterItems
+        g8Car.allItems = filterItems
         
         self.view.addSubview(g8Car)
         
