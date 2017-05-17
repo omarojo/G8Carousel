@@ -11,7 +11,7 @@ import UIKit
 
 class G8Carousel: UIView {
 
-    var allowMultipleSelection = false
+    var allowMultipleSelection = true
     var maximumAllowedItemSelection = 3 //number of allowed items to be selected, ex. no more than 3
     var currentSelectedItems: Array = [G8CarouselItem]() {
         didSet {
@@ -143,9 +143,10 @@ extension G8Carousel: UICollectionViewDelegate, UICollectionViewDataSource{
                     collectionView.deselectItem(at: iPath, animated: true)
                 }
             }
+            currentSelectedItems.removeAll()
             self.currentSelectedItems.append(allItems[indexPath.item])
         }else{
-            currentSelectedItems.removeAll()
+            
             self.currentSelectedItems.append(allItems[indexPath.item])
         }
         
@@ -222,9 +223,9 @@ class G8CarouselItemCell: UICollectionViewCell {
 
 //MARK: G8CarouselItem
 class G8CarouselItem{
-    var name: String = "Filter"
+    var title: String = "Filter"
     var thumb: UIImage = UIImage(named: "filterThumbPlaceHolder")!
-    
+    var id: String?
     
 
 }
